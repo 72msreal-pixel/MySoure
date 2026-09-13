@@ -486,6 +486,7 @@ Shapes={Square=
 ["Glass-0.7"]="rbxassetid://79047752995006",
 ["Glass-1"]="rbxassetid://97324581055162",
 ["Glass-1.4"]="rbxassetid://95071123641270",
+SquircleOutlineHD="rbxassetid://74029063732681",
 }
 }
 
@@ -884,13 +885,15 @@ function p.Tween(r,u,v,...)
 return f:Create(r,TweenInfo.new(u,...),v)
 end
 
+local aHDShapeRadius={SquircleOutlineHD=310}
+
 function p.NewRoundFrame(r,u,v,x,z,A)
 local function getImageForType(B)
 return p.Shapes[B]
 end
 
 local function getSliceCenterForType(B)
-return not table.find({"Shadow-sm","Glass-0.7","Glass-1","Glass-1.4"},B)and Rect.new(256
+return not table.find({"Shadow-sm","Glass-0.7","Glass-1","Glass-1.4","SquircleOutlineHD"},B)and Rect.new(256
 ,256
 ,256
 ,256
@@ -914,7 +917,12 @@ end
 end
 
 local function UpdateSliceScale(C)
-local F=not table.find({"Shadow-sm","Glass-0.7","Glass-1","Glass-1.4"},u)and(C/(256))or(C/512)
+local F
+if aHDShapeRadius[u]then
+F=C/aHDShapeRadius[u]
+else
+F=not table.find({"Shadow-sm","Glass-0.7","Glass-1","Glass-1.4"},u)and(C/(256))or(C/512)
+end
 B.SliceScale=math.max(F,0.0001)
 end
 
@@ -13060,10 +13068,25 @@ ap,
 at,
 })
 
+local aBoxGap=(ak.Box and ak.BoxBorder and ai.Window.ModernLayout and ai.Window.ModernLayoutMergeElements~=false)and 5 or 0
+
+local aWrap=ad("Frame",{
+Name="SectionSpacer",
+Size=UDim2.new(1,0,0,0),
+AutomaticSize="Y",
+BackgroundTransparency=1,
+Parent=ai.Parent,
+},{
+ad("UIPadding",{
+PaddingTop=UDim.new(0,aBoxGap),
+PaddingBottom=UDim.new(0,aBoxGap),
+}),
+})
+
 local av=aa.NewRoundFrame(ai.Window.ElementConfig.UICorner,"Squircle",{
 Size=UDim2.new(1,0,0,0),
 BackgroundTransparency=1,
-Parent=ai.Parent,
+Parent=aWrap,
 ClipsDescendants=true,
 AutomaticSize="Y",
 ThemeTag=ak.Box and{
@@ -13072,7 +13095,7 @@ ImageColor3="SectionBoxBackground",
 }or nil,
 ImageTransparency=not ak.Box and 1 or nil,
 },{
-aa.NewRoundFrame(ai.Window.ElementConfig.UICorner,ai.Window.ModernLayout and"Glass-1"or"SquircleOutline",{
+aa.NewRoundFrame(ai.Window.ElementConfig.UICorner,ai.Window.ModernLayout and"Glass-1"or"SquircleOutlineHD",{
 BackgroundTransparency=1,
 Size=UDim2.new(1,0,1,0),
 ThemeTag={
@@ -13321,7 +13344,7 @@ ay:Destroy()
 end
 end
 
-av:Destroy()
+aWrap:Destroy()
 end
 
 function ak.Open(aw,ax)
@@ -13631,10 +13654,25 @@ ax,
 aB,
 })
 
+local dBoxGap=(am.Box and am.BoxBorder and al.Window.ModernLayout and al.Window.ModernLayoutMergeElements~=false)and 5 or 0
+
+local dWrap=ad("Frame",{
+Name="SectionSpacer",
+Size=UDim2.new(1,0,0,0),
+AutomaticSize="Y",
+BackgroundTransparency=1,
+Parent=al.Parent,
+},{
+ad("UIPadding",{
+PaddingTop=UDim.new(0,dBoxGap),
+PaddingBottom=UDim.new(0,dBoxGap),
+}),
+})
+
 local d=aa.NewRoundFrame(al.Window.ElementConfig.UICorner,"Squircle",{
 Size=UDim2.new(1,0,0,0),
 BackgroundTransparency=1,
-Parent=al.Parent,
+Parent=dWrap,
 ClipsDescendants=true,
 AutomaticSize="Y",
 ThemeTag=am.Box and{
@@ -13645,7 +13683,7 @@ ImageTransparency=not am.Box and 1 or nil,
 },{
 aa.NewRoundFrame(
 al.Window.ElementConfig.UICorner,
-al.Window.ModernLayout and"Glass-1"or"SquircleOutline",
+al.Window.ModernLayout and"Glass-1"or"SquircleOutlineHD",
 {
 BackgroundTransparency=1,
 Size=UDim2.new(1,0,1,0),
@@ -14413,7 +14451,7 @@ j:Destroy()
 end
 end
 
-d:Destroy()
+dWrap:Destroy()
 end
 
 function am.Open(g,h)
