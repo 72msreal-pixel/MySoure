@@ -4928,14 +4928,14 @@ Folder=nil,
 Path=nil,
 Configs={},
 Parser={
-Colorpicker={
-Save=function(af)
-return{
-__type=af.__type,
-value=af.Default:ToHex(),
-transparency=af.Transparency or nil,
-}
-end,
+	Colorpicker={
+	Save=function(af)
+	return{
+	__type=af.__type,
+	value=(af.Value or af.Default):ToHex(),
+	transparency=af.Transparency or nil,
+	}
+	end,
 Load=function(af,ag)
 if af and af.Update then
 af:Update(Color3.fromHex(ag.value),ag.transparency or nil)
@@ -4981,13 +4981,13 @@ af:Set(ag.value)
 end
 end
 },
-Slider={
-Save=function(af)
-return{
-__type=af.__type,
-value=af.Value.Default,
-}
-end,
+	Slider={
+	Save=function(af)
+	return{
+	__type=af.__type,
+	value=tostring(af.Value),
+	}
+	end,
 Load=function(af,ag)
 if af and af.Set then
 af:Set(tonumber(ag.value))
@@ -5028,17 +5028,10 @@ if not isfolder(ae.Path)then
 makefolder(ae.Path)
 end
 
-local ah=ae:AllConfigs()
-
-for ai,aj in next,ah do
-local ak=ae.Path..aj..".json"
-if isfile and readfile and isfile(ak)then
-ae.Configs[aj]=readfile(ak)
-end
-end
-
-return ae
-end
+	ae.Configs=ae.Configs or{}
+	
+	return ae
+	end
 
 function ae.SetPath(af,ag)
 if not ag then
@@ -5155,21 +5148,16 @@ ai:Register(am,an)
 end
 end
 
-task.spawn(function()
-local ao=0
-for am,an in next,(al.__elements or{})do
-if ai.Elements[am]and ae.Parser[an.__type]then
-local ap,ar=pcall(ae.Parser[an.__type].Load,ai.Elements[am],an)
-if not ap then
-warn("[ WindUI.ConfigManager ] Failed to load element '"..tostring(am).."': "..tostring(ar))
-end
-ao=ao+1
-if ao%4==0 then
-task.wait()
-end
-end
-end
-end)
+	for am,an in next,(al.__elements or{})do
+	if ai.Elements[am]and ae.Parser[an.__type]then
+	task.spawn(function()
+	local ap,ar=pcall(ae.Parser[an.__type].Load,ai.Elements[am],an)
+	if not ap then
+	warn("[ WindUI.ConfigManager ] Failed to load element '"..tostring(am).."': "..tostring(ar))
+	end
+	end)
+	end
+	end
 
 ai.CustomData=al.__custom or{}
 
@@ -5219,8 +5207,8 @@ end)
 if aj and ak and ak.__autoload then
 ai.AutoLoad=true
 
-task.spawn(function()
-task.wait(0.5)
+	task.spawn(function()
+	task.wait(0.1)
 local al,am=pcall(function()
 return ai:Load()
 end)
