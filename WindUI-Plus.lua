@@ -471,7 +471,7 @@ Shapes={Square=
 ["Square-Outline"]="rbxassetid://72946211851948",Squircle=
 
 "rbxassetid://80999662900595",SquircleOutline=
-"rbxassetid://74029063732681",
+"rbxassetid://117788349049947",
 ["Squircle-Outline"]="rbxassetid://117817408534198",SquircleOutline2=
 
 "rbxassetid://117817408534198",
@@ -13064,7 +13064,6 @@ local av=aa.NewRoundFrame(ai.Window.ElementConfig.UICorner,"Squircle",{
 Size=UDim2.new(1,0,0,0),
 BackgroundTransparency=1,
 Parent=ai.Parent,
-ClipsDescendants=true,
 AutomaticSize="Y",
 ThemeTag=ak.Box and{
 ImageTransparency="SectionBoxBackgroundTransparency",
@@ -13072,16 +13071,16 @@ ImageColor3="SectionBoxBackground",
 }or nil,
 ImageTransparency=not ak.Box and 1 or nil,
 },{
-aa.NewRoundFrame(ai.Window.ElementConfig.UICorner,ai.Window.ModernLayout and"Glass-1"or"SquircleOutline",{
-BackgroundTransparency=1,
+aa.NewRoundFrame(ai.Window.ElementConfig.UICorner-1,"SquircleOutline",{
 Size=UDim2.new(1,0,1,0),
 ThemeTag={
-ImageTransparency="SectionBoxBorderTransparency",
 ImageColor3="SectionBoxBorder",
 },
-Visible=ak.Box and ak.BoxBorder,
+ImageTransparency=ak.Box and ak.BoxBorder and 0.92 or 1,
 Name="Outline",
-}),
+ClipsDescendants=true,
+},{
+
 ad("TextButton",{
 Name="Top",
 Size=UDim2.new(1,0,0,ak.HeaderSize),
@@ -13132,13 +13131,14 @@ Padding=UDim.new(0,ai.Tab.Gap),
 VerticalAlignment="Top",
 }),
 }),
+}),
 })
 
 ak.ElementFrame=av
 ak.UIElements={
 Main=av,
-Top=av.Top,
-Content=av.Content,
+Top=av.Outline.Top,
+Content=av.Outline.Content,
 Icon=ao,
 Title=aq,
 Desc=ar,
@@ -13152,9 +13152,9 @@ ap.Size=UDim2.new(1,-(aw+ax),0,0)
 end
 
 local function UpdateContentLayout()
-local aw=av.Top.AbsoluteSize.Y/GetUIScale()
-av.Content.Position=UDim2.new(0,0,0,aw)
-av.HeaderDivider.Position=UDim2.new(0.5,0,0,aw)
+local aw=av.Outline.Top.AbsoluteSize.Y/GetUIScale()
+av.Outline.Content.Position=UDim2.new(0,0,0,aw)
+av.Outline.HeaderDivider.Position=UDim2.new(0.5,0,0,aw)
 end
 
 local function SetHoverState(aw)
@@ -13208,8 +13208,8 @@ end
 
 UpdateContentLayout()
 
-local ax=av.Top.AbsoluteSize.Y
-local ay=ak.Opened and av.Content.AbsoluteSize.Y or 0
+local ax=av.Outline.Top.AbsoluteSize.Y
+local ay=ak.Opened and av.Outline.Content.AbsoluteSize.Y or 0
 local az=(ax+ay)/GetUIScale()
 
 local aA=UDim2.new(av.Size.X.Scale,av.Size.X.Offset,0,az)
@@ -13222,7 +13222,7 @@ Size=aA,
 },Enum.EasingStyle.Quint,Enum.EasingDirection.Out):Play()
 end
 
-av.HeaderDivider.Visible=ak.Opened and ak.Box and av.Content.AbsoluteSize.Y>0
+av.Outline.HeaderDivider.Visible=ak.Opened and ak.Box and av.Outline.Content.AbsoluteSize.Y>0
 end
 
 local function EnsureExpandable()
@@ -13232,8 +13232,8 @@ end
 
 ak.Expandable=true
 as.Visible=true
-av.Top.Active=true
-av.Content.Visible=true
+av.Outline.Top.Active=true
+av.Outline.Content.Visible=true
 av.AutomaticSize="None"
 
 UpdateTitleSize()
@@ -13327,7 +13327,7 @@ end
 function ak.Open(aw,ax)
 if ak.Expandable then
 ak.Opened=true
-av.Content.Visible=true
+av.Outline.Content.Visible=true
 SetChevronState(true,ax)
 SyncHeight(ax)
 end
@@ -13347,7 +13347,7 @@ end
 
 local aw=ai.ElementsModule
 
-aw.Load(ak,av.Content,aw.Elements,ai.Window,ai.WindUI,function(ax)
+aw.Load(ak,av.Outline.Content,aw.Elements,ai.Window,ai.WindUI,function(ax)
 EnsureExpandable()
 
 if ak.Opened then
@@ -13357,7 +13357,7 @@ ak:Close(true)
 end
 end,aw,ai.UIScale,ai.Tab)
 
-aa.AddSignal(av.Top:GetPropertyChangedSignal"AbsoluteSize",function()
+aa.AddSignal(av.Outline.Top:GetPropertyChangedSignal"AbsoluteSize",function()
 UpdateTitleSize()
 UpdateContentLayout()
 
@@ -13370,13 +13370,13 @@ aa.AddSignal(at:GetPropertyChangedSignal"AbsoluteSize",function()
 UpdateTitleSize()
 end)
 
-aa.AddSignal(av.Content.UIListLayout:GetPropertyChangedSignal"AbsoluteContentSize",function()
+aa.AddSignal(av.Outline.Content.UIListLayout:GetPropertyChangedSignal"AbsoluteContentSize",function()
 if ak.Expandable then
 SyncHeight(true)
 end
 end)
 
-aa.AddSignal(av.Top.MouseEnter,function()
+aa.AddSignal(av.Outline.Top.MouseEnter,function()
 if not ak.HoverFeedback then
 return
 end
@@ -13385,13 +13385,13 @@ am=true
 SetHoverState(false)
 end)
 
-aa.AddSignal(av.Top.MouseLeave,function()
+aa.AddSignal(av.Outline.Top.MouseLeave,function()
 am=false
 an=false
 SetHoverState(false)
 end)
 
-aa.AddSignal(av.Top.InputBegan,function(ax)
+aa.AddSignal(av.Outline.Top.InputBegan,function(ax)
 if not ak.HoverFeedback or not IsPressInput(ax)then
 return
 end
@@ -13400,7 +13400,7 @@ an=true
 SetHoverState(false)
 end)
 
-aa.AddSignal(av.Top.InputEnded,function(ax)
+aa.AddSignal(av.Outline.Top.InputEnded,function(ax)
 if not ak.HoverFeedback or not IsPressInput(ax)then
 return
 end
@@ -13409,7 +13409,7 @@ an=false
 SetHoverState(false)
 end)
 
-aa.AddSignal(av.Top.Activated,function()
+aa.AddSignal(av.Outline.Top.Activated,function()
 if ak.Expandable then
 if ak.Opened then
 ak:Close()
@@ -13424,10 +13424,10 @@ UpdateTitleSize()
 UpdateContentLayout()
 
 if not ak.Expandable then
-av.Content.Visible=false
-av.Top.Active=false
-av.Top.Size=UDim2.new(1,0,0,ak.HeaderSize)
-av.Top.AutomaticSize="Y"
+av.Outline.Content.Visible=false
+av.Outline.Top.Active=false
+av.Outline.Top.Size=UDim2.new(1,0,0,ak.HeaderSize)
+av.Outline.Top.AutomaticSize="Y"
 av.AutomaticSize="Y"
 end
 
@@ -13635,7 +13635,6 @@ local d=aa.NewRoundFrame(al.Window.ElementConfig.UICorner,"Squircle",{
 Size=UDim2.new(1,0,0,0),
 BackgroundTransparency=1,
 Parent=al.Parent,
-ClipsDescendants=true,
 AutomaticSize="Y",
 ThemeTag=am.Box and{
 ImageTransparency="SectionBoxBackgroundTransparency",
@@ -13643,20 +13642,16 @@ ImageColor3="SectionBoxBackground",
 }or nil,
 ImageTransparency=not am.Box and 1 or nil,
 },{
-aa.NewRoundFrame(
-al.Window.ElementConfig.UICorner,
-al.Window.ModernLayout and"Glass-1"or"SquircleOutline",
-{
-BackgroundTransparency=1,
+aa.NewRoundFrame(al.Window.ElementConfig.UICorner-1,"SquircleOutline",{
 Size=UDim2.new(1,0,1,0),
 ThemeTag={
-ImageTransparency="SectionBoxBorderTransparency",
 ImageColor3="SectionBoxBorder",
 },
-Visible=am.Box and am.BoxBorder,
+ImageTransparency=am.Box and am.BoxBorder and 0.92 or 1,
 Name="Outline",
-}
-),
+ClipsDescendants=true,
+},{
+
 ad("TextButton",{
 Name="Top",
 Size=UDim2.new(1,0,0,am.HeaderSize),
@@ -13738,23 +13733,24 @@ AutomaticSize="Y",
 BackgroundTransparency=1,
 }),
 }),
+}),
 })
 
 am.ElementFrame=d
 am.UIElements={
 Main=d,
-Top=d.Top,
-Content=d.Content,
-Tabs=d.Content.Tabs,
-TabsScroll=d.Content.Tabs.Scroll,
-TabsContent=d.Content.TabsContent,
+Top=d.Outline.Top,
+Content=d.Outline.Content,
+Tabs=d.Outline.Content.Tabs,
+TabsScroll=d.Outline.Content.Tabs.Scroll,
+TabsContent=d.Outline.Content.TabsContent,
 Icon=aw,
 Title=ay,
 Desc=az,
 Chevron=aA.ImageLabel,
 }
 
-local f=d.Content.Tabs.Scroll.UIListLayout
+local f=d.Outline.Content.Tabs.Scroll.UIListLayout
 
 local function UpdateTitleSize()
 local g=aw.Visible and(ToLayoutOffset(aw.AbsoluteSize.X)+am.HeaderGap)or 0
@@ -13850,9 +13846,9 @@ UpdateWindowScrollLock()
 end
 
 local function UpdateContentLayout()
-local g=d.Top.AbsoluteSize.Y/GetUIScale()
-d.Content.Position=UDim2.new(0,0,0,g)
-d.HeaderDivider.Position=UDim2.new(0.5,0,0,g)
+local g=d.Outline.Top.AbsoluteSize.Y/GetUIScale()
+d.Outline.Content.Position=UDim2.new(0,0,0,g)
+d.Outline.HeaderDivider.Position=UDim2.new(0.5,0,0,g)
 end
 
 local function SetHoverState(g)
@@ -13903,8 +13899,8 @@ end
 UpdateTabsAlignment()
 UpdateContentLayout()
 
-local h=d.Top.AbsoluteSize.Y
-local j=am.Opened and d.Content.AbsoluteSize.Y or 0
+local h=d.Outline.Top.AbsoluteSize.Y
+local j=am.Opened and d.Outline.Content.AbsoluteSize.Y or 0
 local l=(h+j)/GetUIScale()
 
 local m=UDim2.new(d.Size.X.Scale,d.Size.X.Offset,0,l)
@@ -13917,7 +13913,7 @@ Size=m,
 },Enum.EasingStyle.Quint,Enum.EasingDirection.Out):Play()
 end
 
-d.HeaderDivider.Visible=am.Opened and am.Box and d.Content.AbsoluteSize.Y>0
+d.Outline.HeaderDivider.Visible=am.Opened and am.Box and d.Outline.Content.AbsoluteSize.Y>0
 end
 
 local function EnsureExpandable()
@@ -13927,8 +13923,8 @@ end
 
 am.Expandable=true
 aA.Visible=true
-d.Top.Active=true
-d.Content.Visible=true
+d.Outline.Top.Active=true
+d.Outline.Content.Visible=true
 d.AutomaticSize="None"
 
 UpdateTitleSize()
@@ -14419,7 +14415,7 @@ end
 function am.Open(g,h)
 if am.Expandable then
 am.Opened=true
-d.Content.Visible=true
+d.Outline.Content.Visible=true
 SetChevronState(true,h)
 SyncHeight(h)
 UpdateWindowScrollLock()
@@ -14439,7 +14435,7 @@ if am.Icon then
 am:SetIcon(am.Icon)
 end
 
-aa.AddSignal(d.Top:GetPropertyChangedSignal"AbsoluteSize",function()
+aa.AddSignal(d.Outline.Top:GetPropertyChangedSignal"AbsoluteSize",function()
 UpdateTitleSize()
 UpdateContentLayout()
 
@@ -14452,7 +14448,7 @@ aa.AddSignal(aB:GetPropertyChangedSignal"AbsoluteSize",function()
 UpdateTitleSize()
 end)
 
-aa.AddSignal(d.Content.UIListLayout:GetPropertyChangedSignal"AbsoluteContentSize",function()
+aa.AddSignal(d.Outline.Content.UIListLayout:GetPropertyChangedSignal"AbsoluteContentSize",function()
 if am.Expandable then
 SyncHeight(true)
 end
@@ -14496,7 +14492,7 @@ local m=math.clamp(h.CanvasPosition.X+l,0,j)
 h.CanvasPosition=Vector2.new(m,0)
 end)
 
-aa.AddSignal(d.Top.MouseEnter,function()
+aa.AddSignal(d.Outline.Top.MouseEnter,function()
 if not am.HoverFeedback then
 return
 end
@@ -14505,13 +14501,13 @@ ao=true
 SetHoverState(false)
 end)
 
-aa.AddSignal(d.Top.MouseLeave,function()
+aa.AddSignal(d.Outline.Top.MouseLeave,function()
 ao=false
 ap=false
 SetHoverState(false)
 end)
 
-aa.AddSignal(d.Top.InputBegan,function(g)
+aa.AddSignal(d.Outline.Top.InputBegan,function(g)
 if not am.HoverFeedback or not IsPressInput(g)then
 return
 end
@@ -14520,7 +14516,7 @@ ap=true
 SetHoverState(false)
 end)
 
-aa.AddSignal(d.Top.InputEnded,function(g)
+aa.AddSignal(d.Outline.Top.InputEnded,function(g)
 if not am.HoverFeedback or not IsPressInput(g)then
 return
 end
@@ -14529,7 +14525,7 @@ ap=false
 SetHoverState(false)
 end)
 
-aa.AddSignal(d.Top.Activated,function()
+aa.AddSignal(d.Outline.Top.Activated,function()
 if am.Expandable then
 if am.Opened then
 am:Close()
@@ -14545,10 +14541,10 @@ UpdateContentLayout()
 UpdateTabsAlignment()
 
 if not am.Expandable then
-d.Content.Visible=false
-d.Top.Active=false
-d.Top.Size=UDim2.new(1,0,0,am.HeaderSize)
-d.Top.AutomaticSize="Y"
+d.Outline.Content.Visible=false
+d.Outline.Top.Active=false
+d.Outline.Top.Size=UDim2.new(1,0,0,am.HeaderSize)
+d.Outline.Top.AutomaticSize="Y"
 d.AutomaticSize="Y"
 end
 
