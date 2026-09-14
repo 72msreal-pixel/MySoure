@@ -7,7 +7,7 @@ print([[
   \__/\  / |__|___|  /\____ ||______/ |___|  |____|   |____/____//____  >
        \/          \/      \/                                         \/ 
                                                           
-                       WindUI Plus - Version 0.0.3
+             WindUI Plus - Version 0.0.2
 ]])
 
 local a={cache={}::any}do do local function __modImpl()local b=(cloneref or clonereference or function(b)return b end)
@@ -2062,7 +2062,7 @@ New=a.i().New
 return[[
 {
     "name": "windui-plus",
-    "version": "v0.0.3",
+    "version": "v0.0.2",
     "main": "./dist/main.lua",
     "repository": "https://github.com/",
     "discord": "http://discord.gg/AxosHub",
@@ -4928,14 +4928,14 @@ Folder=nil,
 Path=nil,
 Configs={},
 Parser={
-	Colorpicker={
-	Save=function(af)
-	return{
-	__type=af.__type,
-	value=(af.Value or af.Default):ToHex(),
-	transparency=af.Transparency or nil,
-	}
-	end,
+Colorpicker={
+Save=function(af)
+return{
+__type=af.__type,
+value=af.Default:ToHex(),
+transparency=af.Transparency or nil,
+}
+end,
 Load=function(af,ag)
 if af and af.Update then
 af:Update(Color3.fromHex(ag.value),ag.transparency or nil)
@@ -4981,13 +4981,13 @@ af:Set(ag.value)
 end
 end
 },
-	Slider={
-	Save=function(af)
-	return{
-	__type=af.__type,
-	value=tostring(af.Value),
-	}
-	end,
+Slider={
+Save=function(af)
+return{
+__type=af.__type,
+value=af.Value.Default,
+}
+end,
 Load=function(af,ag)
 if af and af.Set then
 af:Set(tonumber(ag.value))
@@ -5028,37 +5028,16 @@ if not isfolder(ae.Path)then
 makefolder(ae.Path)
 end
 
-	ae.Configs=ae.Configs or{}
-	
-	return ae
-	end
+local ah=ae:AllConfigs()
 
-function ae._BatchLoad(af,ag)
-local ah={}
-for ai,aj in next,ag do
-ah[#ah+1]={ai,aj}
-end
-local ak=#ah
-if ak==0 then return end
-local al=0
-local am;am=ab.Heartbeat:Connect(function()
-local an=os.clock()
-while al<ak and (os.clock()-an)<0.003 do
-al=al+1
-local ao=ah[al]
-local ap=ai and ai.Elements and ai.Elements[ao[1]]
-local ar=ao[2]
-if ap and ar and ae.Parser[ar.__type]then
-local as,at=pcall(ae.Parser[ar.__type].Load,ap,ar)
-if not as then
-warn("[ WindUI.ConfigManager ] Failed to load element '"..tostring(ao[1]).."': "..tostring(at))
+for ai,aj in next,ah do
+local ak=ae.Path..aj..".json"
+if isfile and readfile and isfile(ak)then
+ae.Configs[aj]=readfile(ak)
 end
 end
-end
-if al>=ak then
-am:Disconnect()
-end
-end)
+
+return ae
 end
 
 function ae.SetPath(af,ag)
@@ -5176,9 +5155,23 @@ ai:Register(am,an)
 end
 end
 
-	ae:_BatchLoad(al.__elements or{})
+task.spawn(function()
+local ao=0
+for am,an in next,(al.__elements or{})do
+if ai.Elements[am]and ae.Parser[an.__type]then
+local ap,ar=pcall(ae.Parser[an.__type].Load,ai.Elements[am],an)
+if not ap then
+warn("[ WindUI.ConfigManager ] Failed to load element '"..tostring(am).."': "..tostring(ar))
+end
+ao=ao+1
+if ao%4==0 then
+task.wait()
+end
+end
+end
+end)
 
-	ai.CustomData=al.__custom or{}
+ai.CustomData=al.__custom or{}
 
 return ai.CustomData
 end
@@ -5226,8 +5219,8 @@ end)
 if aj and ak and ak.__autoload then
 ai.AutoLoad=true
 
-	task.spawn(function()
-	task.wait(0.1)
+task.spawn(function()
+task.wait(0.5)
 local al,am=pcall(function()
 return ai:Load()
 end)
@@ -18364,36 +18357,24 @@ end
 
 if av.PendingConfigData and next(av.PendingConfigData)~=nil then
 local G=av.ConfigManager and av.ConfigManager.Parser
-local H={}
-for J,L in next,av.PendingConfigData do
-H[#H+1]={J,L}
-end
-local M=#H
-local N=0
-local O;O=game:GetService("RunService").Heartbeat:Connect(function()
-local P=os.clock()
-while N<M and (os.clock()-P)<0.003 do
-N=N+1
-local Q=H[N]
-local R=Q[1]
-local S=Q[2]
-local T=av.FlagIndex and av.FlagIndex[R]
-local U=G and S and S.__type and G[S.__type]
-if T and U and U.Load then
-local V,W=pcall(function()
-U.Load(T,S)
+
+for H,J in next,av.PendingConfigData do
+local L=av.FlagIndex and av.FlagIndex[H]
+local M=G and J and J.__type and G[J.__type]
+
+if L and M and M.Load then
+local N,O=pcall(function()
+M.Load(L,J)
 end)
-if V then
-av.PendingConfigData[R]=nil
+
+if N then
+av.PendingConfigData[H]=nil
 else
-warn("[ WindUI ] Failed to apply pending config for '"..tostring(R).."': "..tostring(W))
+warn("[ WindUI ] Failed to apply pending config for '"..tostring(H).."': "..tostring(O))
 end
 end
 end
-if N>=M then
-O:Disconnect()
 end
-end)
 end
 
 function av.GetFlagElement(C,F)
