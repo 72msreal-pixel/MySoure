@@ -7,7 +7,7 @@ print([[
   \__/\  / |__|___|  /\____ ||______/ |___|  |____|   |____/____//____  >
        \/          \/      \/                                         \/ 
                                                           
-             WindUI Plus - Version 0.0.1
+             WindUI Plus - Version 0.0.2
 ]])
 
 local a={cache={}::any}do do local function __modImpl()local b=(cloneref or clonereference or function(b)return b end)
@@ -2062,7 +2062,7 @@ New=a.i().New
 return[[
 {
     "name": "windui-plus",
-    "version": "v0.0.1",
+    "version": "v0.0.2",
     "main": "./dist/main.lua",
     "repository": "https://github.com/",
     "discord": "http://discord.gg/AxosHub",
@@ -5155,13 +5155,21 @@ ai:Register(am,an)
 end
 end
 
+task.spawn(function()
+local ao=0
 for am,an in next,(al.__elements or{})do
 if ai.Elements[am]and ae.Parser[an.__type]then
-task.spawn(function()
-ae.Parser[an.__type].Load(ai.Elements[am],an)
+local ap,ar=pcall(ae.Parser[an.__type].Load,ai.Elements[am],an)
+if not ap then
+warn("[ WindUI.ConfigManager ] Failed to load element '"..tostring(am).."': "..tostring(ar))
+end
+ao=ao+1
+if ao%4==0 then
+task.wait()
+end
+end
+end
 end)
-end
-end
 
 ai.CustomData=al.__custom or{}
 
@@ -14948,6 +14956,20 @@ end
 end
 end
 
+local PendingShapeUpdates={}
+local function QueueShapeUpdate(ao)
+if not ao or PendingShapeUpdates[ao]then
+return
+end
+PendingShapeUpdates[ao]=true
+task.defer(function()
+PendingShapeUpdates[ao]=nil
+if ao.UpdateAllElementShapes then
+ao:UpdateAllElementShapes(ao)
+end
+end)
+end
+
 for an,ao in next,ae do
 aa[an]=function(ap,aq)
 aq=aq or{}
@@ -15056,11 +15078,9 @@ af.PendingFlags[aq.Flag]=nil
 end
 end
 
-if aa.UpdateAllElementShapes then
-aa:UpdateAllElementShapes(aa)
-end
-if aq.Tab and aq.Tab~=aa and aq.Tab.UpdateAllElementShapes then
-aq.Tab:UpdateAllElementShapes(aq.Tab)
+QueueShapeUpdate(aa)
+if aq.Tab and aq.Tab~=aa then
+QueueShapeUpdate(aq.Tab)
 end
 end
 
@@ -15073,7 +15093,7 @@ table.insert(aq.Tab.Elements,as)
 end
 
 if af.ModernLayout then
-aa:UpdateAllElementShapes(aa)
+QueueShapeUpdate(aa)
 end
 
 if ai then
