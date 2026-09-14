@@ -880,93 +880,8 @@ end
 return x
 end
 
-local __springUnpack,__springPack
-do
-function __springUnpack(v)
-local t=typeof(v)
-if t=="number"then return{v},t end
-if t=="Color3"then return{v.R,v.G,v.B},t end
-if t=="UDim2"then return{v.X.Scale,v.X.Offset,v.Y.Scale,v.Y.Offset},t end
-if t=="UDim"then return{v.Scale,v.Offset},t end
-if t=="Vector2"then return{v.X,v.Y},t end
-if t=="Vector3"then return{v.X,v.Y,v.Z},t end
-if t=="Rect"then return{v.Min.X,v.Min.Y,v.Max.X,v.Max.Y},t end
-return nil,t
-end
-function __springPack(a,t)
-if t=="number"then return a[1]end
-if t=="Color3"then return Color3.new(math.clamp(a[1],0,1),math.clamp(a[2],0,1),math.clamp(a[3],0,1))end
-if t=="UDim2"then return UDim2.new(a[1],a[2],a[3],a[4])end
-if t=="UDim"then return UDim.new(a[1],a[2])end
-if t=="Vector2"then return Vector2.new(a[1],a[2])end
-if t=="Vector3"then return Vector3.new(a[1],a[2],a[3])end
-if t=="Rect"then return Rect.new(a[1],a[2],a[3],a[4])end
-end
-end
 function p.Tween(r,u,v,...)
-u=u or 0.2
-local freq=math.clamp(1.6/math.max(u,0.05),3,9)
-local zeta=0.9
-local w0=freq*2*math.pi
-local goals={}
-for prop,goal in pairs(v)do goals[prop]=goal end
-local conn=nil
-local playing=false
-local cbs={}
-local api={}
-local function stop()
-if conn then conn:Disconnect()conn=nil end
-playing=false
-end
-local function fire()
-for _,cb in ipairs(cbs)do task.spawn(cb)end
-end
-function api.Play()
-if playing then return api end
-stop()
-local channels={}
-for prop,goal in pairs(goals)do
-local ok,cur=pcall(function()return r[prop]end)
-if ok then
-local arr,t=__springUnpack(cur)
-local garr=__springUnpack(goal)
-if arr and garr and#arr==#garr then
-local vel={}
-for i=1,#arr do vel[i]=0 end
-channels[prop]={pos=arr,vel=vel,goal=garr,t=t}
-else
-pcall(function()r[prop]=goal end)
-end
-end
-end
-playing=true
-conn=d.Heartbeat:Connect(function(dt)
-if dt>0.1 then dt=0.1 end
-local done=true
-for prop,ch in pairs(channels)do
-for i=1,#ch.pos do
-local x=ch.pos[i]-ch.goal[i]
-local acc=-w0*w0*x-2*zeta*w0*ch.vel[i]
-ch.vel[i]=ch.vel[i]+acc*dt
-ch.pos[i]=ch.pos[i]+ch.vel[i]*dt
-if math.abs(ch.pos[i]-ch.goal[i])>1e-3 or math.abs(ch.vel[i])>1e-3 then done=false end
-end
-pcall(function()r[prop]=__springPack(ch.pos,ch.t)end)
-end
-if done then
-stop()
-for prop,ch in pairs(channels)do pcall(function()r[prop]=__springPack(ch.goal,ch.t)end)end
-fire()
-end
-end)
-return api
-end
-function api.Cancel()stop()end
-api.Destroy=api.Cancel
-api.Pause=api.Cancel
-api.Completed={Connect=function(_,cb)table.insert(cbs,cb)return{Disconnect=function()end}end,Wait=function()end}
-api.PlaybackState=Enum.PlaybackState.Begin
-return api
+return f:Create(r,TweenInfo.new(u,...),v)
 end
 
 function p.NewRoundFrame(r,u,v,x,z,A)
@@ -5202,19 +5117,7 @@ end
 
 local al=ac:JSONEncode(ak)
 if writefile then
-ai.__pendingSave=al
-if not ai.__saveScheduled then
-ai.__saveScheduled=true
-task.delay(0.15,function()
-ai.__saveScheduled=false
-local data=ai.__pendingSave
-ai.__pendingSave=nil
-if data then
-local ok,err=pcall(writefile,ai.Path,data)
-if not ok then warn("[ WindUI.ConfigManager ] Save failed: "..tostring(err))end
-end
-end)
-end
+writefile(ai.Path,al)
 end
 
 return ak
@@ -15850,7 +15753,9 @@ local aq=TweenInfo.new(
 Enum.EasingStyle.Quart,
 Enum.EasingDirection.Out
 )
-local ar=p.Tween(ak.Containers[an],0.15,{AnchorPoint=Vector2.new(0,0)})
+local ar=ap:Create(ak.Containers[an],aq,{
+AnchorPoint=Vector2.new(0,0)
+})
 ar:Play()
 end)
 
