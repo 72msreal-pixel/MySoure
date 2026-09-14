@@ -7,7 +7,7 @@ print([[
   \__/\  / |__|___|  /\____ ||______/ |___|  |____|   |____/____//____  >
        \/          \/      \/                                         \/ 
                                                           
-             WindUI Plus - Version 0.0.2
+                       WindUI Plus - Version 0.0.2
 ]])
 
 local a={cache={}::any}do do local function __modImpl()local b=(cloneref or clonereference or function(b)return b end)
@@ -5033,6 +5033,34 @@ end
 	return ae
 	end
 
+function ae._BatchLoad(af,ag)
+local ah={}
+for ai,aj in next,ag do
+ah[#ah+1]={ai,aj}
+end
+local ak=#ah
+if ak==0 then return end
+local al=0
+local am;am=ab.Heartbeat:Connect(function()
+local an=os.clock()
+while al<ak and (os.clock()-an)<0.003 do
+al=al+1
+local ao=ah[al]
+local ap=ai and ai.Elements and ai.Elements[ao[1]]
+local ar=ao[2]
+if ap and ar and ae.Parser[ar.__type]then
+local as,at=pcall(ae.Parser[ar.__type].Load,ap,ar)
+if not as then
+warn("[ WindUI.ConfigManager ] Failed to load element '"..tostring(ao[1]).."': "..tostring(at))
+end
+end
+end
+if al>=ak then
+am:Disconnect()
+end
+end)
+end
+
 function ae.SetPath(af,ag)
 if not ag then
 warn"[ WindUI.ConfigManager ] Custom path is not specified."
@@ -5148,18 +5176,9 @@ ai:Register(am,an)
 end
 end
 
-	for am,an in next,(al.__elements or{})do
-	if ai.Elements[am]and ae.Parser[an.__type]then
-	task.spawn(function()
-	local ap,ar=pcall(ae.Parser[an.__type].Load,ai.Elements[am],an)
-	if not ap then
-	warn("[ WindUI.ConfigManager ] Failed to load element '"..tostring(am).."': "..tostring(ar))
-	end
-	end)
-	end
-	end
+	ae:_BatchLoad(al.__elements or{})
 
-ai.CustomData=al.__custom or{}
+	ai.CustomData=al.__custom or{}
 
 return ai.CustomData
 end
@@ -18345,24 +18364,36 @@ end
 
 if av.PendingConfigData and next(av.PendingConfigData)~=nil then
 local G=av.ConfigManager and av.ConfigManager.Parser
-
-for H,J in next,av.PendingConfigData do
-local L=av.FlagIndex and av.FlagIndex[H]
-local M=G and J and J.__type and G[J.__type]
-
-if L and M and M.Load then
-local N,O=pcall(function()
-M.Load(L,J)
+local H={}
+for J,L in next,av.PendingConfigData do
+H[#H+1]={J,L}
+end
+local M=#H
+local N=0
+local O;O=game:GetService("RunService").Heartbeat:Connect(function()
+local P=os.clock()
+while N<M and (os.clock()-P)<0.003 do
+N=N+1
+local Q=H[N]
+local R=Q[1]
+local S=Q[2]
+local T=av.FlagIndex and av.FlagIndex[R]
+local U=G and S and S.__type and G[S.__type]
+if T and U and U.Load then
+local V,W=pcall(function()
+U.Load(T,S)
 end)
-
-if N then
-av.PendingConfigData[H]=nil
+if V then
+av.PendingConfigData[R]=nil
 else
-warn("[ WindUI ] Failed to apply pending config for '"..tostring(H).."': "..tostring(O))
+warn("[ WindUI ] Failed to apply pending config for '"..tostring(R).."': "..tostring(W))
 end
 end
 end
+if N>=M then
+O:Disconnect()
 end
+end)
 end
 
 function av.GetFlagElement(C,F)
