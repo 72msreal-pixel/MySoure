@@ -1,4 +1,4 @@
-local Rayfield = loadstring(readfile("Rayfield-Plus.luau"))()
+local Rayfield = loadstring(game:HttpGet("https://cdn.jsdelivr.net/gh/72msreal-pixel/MySoure@main/Rayfield-Plus.luau"))()
 
 local translations = {
     fr = {
