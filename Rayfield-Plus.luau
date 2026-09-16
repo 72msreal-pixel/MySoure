@@ -4215,6 +4215,10 @@ local lockable = require(utility.lockable)
 local locale = require(utility.locale)
 local hapticEngine = require(utility.HapticEngine)
 
+local titleSize, descSize, textWidth = 16, 12, 250
+local baseContainerH, baseMainH = 16, 43
+local descLayoutTween = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
 function Button.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -4246,17 +4250,20 @@ function Button:_runCallback()
     self.window:_runGuarded(self, self.callback)
 end
 
+function Button:_computeInlineLayout()
+    local titleH = functions.textHeight(self.window.theme.Font, titleSize, locale.resolve(self.name), textWidth)
+    local descH = functions.textHeight(self.window.theme.Font, descSize, locale.resolve(self.description or ""), textWidth)
+    local containerH = titleH + 3 + descH
+    local mainH = math.max(baseMainH, baseMainH - baseContainerH + containerH)
+    return titleH, descH, containerH, mainH
+end
+
 function Button:_buildFull()
-    local inlineDesc = self.window.inlineDescriptions and self.description and self.description ~= ""
-    local titleSize, descSize, textWidth = 16, 12, 250
-    local baseContainerH, baseMainH = 16, 43
+    local inlineDesc = self.window.inlineDescriptions and self.description and self.description ~= "" and true or false
     local containerH, mainH = baseContainerH, baseMainH
     local titleH, descH = baseContainerH, 0
     if inlineDesc then
-        titleH = functions.textHeight(self.window.theme.Font, titleSize, locale.resolve(self.name), textWidth)
-        descH = functions.textHeight(self.window.theme.Font, descSize, locale.resolve(self.description), textWidth)
-        containerH = titleH + 3 + descH
-        mainH = math.max(baseMainH, baseMainH - baseContainerH + containerH)
+        titleH, descH, containerH, mainH = self:_computeInlineLayout()
     end
     self._inlineDesc, self._mainH = inlineDesc, mainH
 
@@ -4411,6 +4418,143 @@ function Button:_buildFull()
                 :Play()
         end)
     end)
+end
+
+function Button:_resizeMain(mainH, animate)
+    local target = UDim2.new(1, -20, 0, mainH)
+    if animate then
+        variables.tweenService:Create(self.main, descLayoutTween, { Size = target }):Play()
+    else
+        self.main.Size = target
+    end
+end
+
+function Button:_layoutInlineDescription(animate)
+    local titleH, descH, containerH, mainH = self:_computeInlineLayout()
+    self._mainH = mainH
+
+    self.title.Text = locale.resolve(self.name)
+    self.title.Size = UDim2.new(1, 0, 0, titleH)
+    self.descLabel.Text = locale.resolve(self.description)
+    self.descLabel.Size = UDim2.new(1, 0, 0, descH)
+    self.textColumn.Size = UDim2.new(0, textWidth, 0, containerH)
+    self.container.Size = UDim2.new(0, 170, 0, containerH)
+
+    self:_resizeMain(mainH, animate)
+end
+
+function Button:_syncDescriptor(shown, animate)
+    local hasDesc = self.description ~= nil and self.description ~= ""
+    if hasDesc then
+        if self.descriptor then
+            self.descriptor.titleLabel.Text = locale.resolve(self.description)
+        else
+            self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+            self.descriptor.main.LayoutOrder = self.main.LayoutOrder + 1
+            if shown then
+                self.window:_reveal(self.descriptor.titleLabel, { TextTransparency = 0.7 }, animate)
+            end
+        end
+    elseif self.descriptor then
+        self.window:_cancelReveal(self.descriptor.titleLabel)
+        self.descriptor.main:Destroy()
+        self.descriptor = nil
+    end
+end
+
+function Button:_refreshDescriptionLayout(animate)
+    if self.compact or not self.main then
+        return
+    end
+
+    local window = self.window
+    local shown = self.title.TextTransparency < 1
+    local hasDesc = self.description ~= nil and self.description ~= ""
+    local wantInline = window.inlineDescriptions and hasDesc
+    local isInline = self._inlineDesc and true or false
+
+    if wantInline == isInline then
+        if wantInline then
+            self:_layoutInlineDescription(animate)
+        else
+            self:_syncDescriptor(shown, animate)
+        end
+        return
+    end
+
+    if wantInline then
+        if self.descriptor then
+            window:_cancelReveal(self.descriptor.titleLabel)
+            self.descriptor.main:Destroy()
+            self.descriptor = nil
+        end
+
+        local _, _, containerH = self:_computeInlineLayout()
+
+        self.textColumn = window:Create("Frame", {
+            BackgroundTransparency = 1,
+            Size = UDim2.new(0, textWidth, 0, containerH),
+            LayoutOrder = 1,
+
+            Parent = self.container,
+        })
+        window:Create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Vertical,
+            Padding = UDim.new(0, 3),
+
+            Parent = self.textColumn,
+        })
+
+        window:_cancelReveal(self.title)
+        self.title.Parent = self.textColumn
+        self.title.AutomaticSize = Enum.AutomaticSize.None
+        self.title.LayoutOrder = 1
+
+        self.descLabel = window:Create("TextLabel", {
+            Text = locale.t(self.description),
+            Size = UDim2.new(1, 0, 0, 0),
+            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
+            TextSize = descSize,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            TextWrapped = true,
+            LayoutOrder = 2,
+
+            TextTransparency = 1,
+
+            Parent = self.textColumn,
+        }, { TextColor3 = "ContentColor", FontFace = "Font" })
+
+        self._inlineDesc = true
+        self:_layoutInlineDescription(animate)
+
+        if shown then
+            window:_reveal(self.descLabel, { TextTransparency = 0.7 }, animate)
+        end
+    else
+        window:_cancelReveal(self.title)
+        self.title.Parent = self.container
+        self.title.AutomaticSize = Enum.AutomaticSize.X
+        self.title.Size = UDim2.fromOffset(textWidth, baseContainerH)
+        self.title.LayoutOrder = 1
+
+        if self.descLabel then
+            window:_cancelReveal(self.descLabel)
+        end
+        if self.textColumn then
+            self.textColumn:Destroy()
+            self.textColumn = nil
+        end
+        self.descLabel = nil
+
+        self.container.Size = UDim2.new(0, 170, 0, baseContainerH)
+        self._inlineDesc = false
+        self._mainH = baseMainH
+        self:_resizeMain(baseMainH, animate)
+
+        self:_syncDescriptor(shown, animate)
+    end
 end
 
 function Button:_buildCompact()
@@ -7970,6 +8114,114 @@ function Dropdown:_close()
         :Play()
 end
 
+function Dropdown:_refreshDescriptionLayout(animate)
+    if not self.main or self._isOpen then
+        return
+    end
+
+    local window = self.window
+    local hasDesc = self.description ~= nil and self.description ~= ""
+    local wantInline = window.inlineDescriptions and hasDesc
+    local isInline = self.descLabel ~= nil
+
+    if wantInline == isInline then
+        return
+    end
+
+    local shown = self.title.TextTransparency < 1
+
+    if wantInline then
+        if self.descriptor then
+            window:_cancelReveal(self.descriptor.titleLabel)
+            self.descriptor.main:Destroy()
+            self.descriptor = nil
+        end
+
+        self._headerH = math.max(
+            headerHeight,
+            headerHeight - 16 + (functions.textHeight(window.theme.Font, 16, locale.resolve(self.name), 150) + 3 + functions.textHeight(window.theme.Font, 12, locale.resolve(self.description), 150))
+        )
+
+        local textColumn = window:Create("Frame", {
+            BackgroundTransparency = 1,
+            AutomaticSize = Enum.AutomaticSize.Y,
+            BorderSizePixel = 0,
+            LayoutOrder = 1,
+            ZIndex = 5,
+
+            Parent = self.container,
+        })
+
+        window:Create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Vertical,
+            Padding = UDim.new(0, 3),
+            SortOrder = Enum.SortOrder.LayoutOrder,
+
+            Parent = textColumn,
+        })
+
+        window:_cancelReveal(self.title)
+        self.title.Parent = textColumn
+        self.title.Size = UDim2.new(0, 150, 0, functions.textHeight(window.theme.Font, 16, locale.resolve(self.name), 150))
+        self.title.AutomaticSize = Enum.AutomaticSize.None
+        self.title.TextWrapped = true
+
+        self.descLabel = window:Create("TextLabel", {
+            Text = locale.t(self.description),
+            Size = UDim2.new(0, 150, 0, functions.textHeight(window.theme.Font, 12, locale.resolve(self.description), 150)),
+            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
+            TextSize = 12,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            TextWrapped = true,
+            LayoutOrder = 2,
+            ZIndex = 5,
+
+            TextTransparency = 1,
+
+            Parent = textColumn,
+        }, { TextColor3 = "ContentColor", FontFace = "Font" })
+
+        if shown then
+            window:_reveal(self.descLabel, { TextTransparency = 0.7 }, animate)
+        end
+    else
+        local oldColumn = self.title.Parent
+        window:_cancelReveal(self.title)
+        self.title.Parent = self.container
+        self.title.Size = UDim2.fromOffset(150, 16)
+        self.title.AutomaticSize = Enum.AutomaticSize.X
+        self.title.LayoutOrder = 1
+
+        window:_cancelReveal(self.descLabel)
+        self.descLabel:Destroy()
+        self.descLabel = nil
+        if oldColumn and oldColumn ~= self.container then
+            oldColumn:Destroy()
+        end
+
+        self._headerH = nil
+
+        self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+        self.descriptor.main.LayoutOrder = self.main.LayoutOrder + 1
+        if shown then
+            window:_reveal(self.descriptor.titleLabel, { TextTransparency = 0.7 }, animate)
+        end
+    end
+
+    local headerH = self._headerH or headerHeight
+    local target = UDim2.new(1, -20, 0, headerH)
+    if animate then
+        variables.tweenService:Create(self.main, searchTween, { Size = target }):Play()
+    else
+        self.main.Size = target
+    end
+    self.top.Size = UDim2.new(1, 0, 0, headerH)
+    self.interact.Size = UDim2.new(1, 0, 0, headerH)
+    self.panel.Size = UDim2.new(1, 0, 1, -(headerH + headerGap))
+end
+
 function Dropdown:_destroyOption(data)
     if data.connections then
         for _, connection in data.connections do
@@ -8436,6 +8688,10 @@ local hapticEngine = require(utility.HapticEngine)
 local resizeInfo = constants.pillResizeInfo
 
 local focusInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local descLayoutTween = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+local titleSize, descSize, textWidth = 16, 12, 150
+local baseContainerH, baseMainH = 16, 41
 
 local function parseExp(text)
     local a, b = text:match("^([%d%.%-]+)%^([%d%.%-]+)$")
@@ -8473,16 +8729,11 @@ function Input.new(tab, properties)
         or (not self.forgetState and functions.deriveFlagFromName(self.name) or nil)
     self.window:_registerControl(self)
 
-    local inlineDesc = self.window.inlineDescriptions and self.description and self.description ~= ""
-    local titleSize, descSize, textWidth = 16, 12, 150
-    local baseContainerH, baseMainH = 16, 41
+    local inlineDesc = self.window.inlineDescriptions and self.description and self.description ~= "" and true or false
     local containerH, mainH = baseContainerH, baseMainH
     local titleH, descH = baseContainerH, 0
     if inlineDesc then
-        titleH = functions.textHeight(self.window.theme.Font, titleSize, locale.resolve(self.name), textWidth)
-        descH = functions.textHeight(self.window.theme.Font, descSize, locale.resolve(self.description), textWidth)
-        containerH = titleH + 3 + descH
-        mainH = math.max(baseMainH, baseMainH - baseContainerH + containerH)
+        titleH, descH, containerH, mainH = self:_computeInlineLayout()
     end
     self._inlineDesc, self._mainH = inlineDesc, mainH
 
@@ -8669,6 +8920,153 @@ function Input.new(tab, properties)
     return self
 end
 
+function Input:_computeInlineLayout()
+    local titleH = functions.textHeight(self.window.theme.Font, titleSize, locale.resolve(self.name), textWidth)
+    local descH = functions.textHeight(self.window.theme.Font, descSize, locale.resolve(self.description or ""), textWidth)
+    local containerH = titleH + 3 + descH
+    local mainH = math.max(baseMainH, baseMainH - baseContainerH + containerH)
+    return titleH, descH, containerH, mainH
+end
+
+function Input:_resizeMain(mainH, animate)
+    local target = UDim2.new(1, -20, 0, mainH)
+    if animate then
+        variables.tweenService:Create(self.main, descLayoutTween, { Size = target }):Play()
+    else
+        self.main.Size = target
+    end
+end
+
+function Input:_layoutInlineDescription(animate)
+    local titleH, descH, containerH, mainH = self:_computeInlineLayout()
+    self._mainH = mainH
+
+    self.title.Text = locale.resolve(self.name)
+    self.title.Size = UDim2.new(1, 0, 0, titleH)
+    self.descLabel.Text = locale.resolve(self.description)
+    self.descLabel.Size = UDim2.new(1, 0, 0, descH)
+    self.textColumn.Size = UDim2.new(0, textWidth, 0, containerH)
+    self.container.Size = UDim2.new(0, 170, 0, containerH)
+
+    self:_resizeMain(mainH, animate)
+end
+
+function Input:_syncDescriptor(shown, animate)
+    local hasDesc = self.description ~= nil and self.description ~= ""
+    if hasDesc then
+        if self.descriptor then
+            self.descriptor.titleLabel.Text = locale.resolve(self.description)
+        else
+            self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+            self.descriptor.main.LayoutOrder = self.main.LayoutOrder + 1
+            if shown then
+                self.window:_reveal(self.descriptor.titleLabel, { TextTransparency = 0.7 }, animate)
+            end
+        end
+    elseif self.descriptor then
+        self.window:_cancelReveal(self.descriptor.titleLabel)
+        self.descriptor.main:Destroy()
+        self.descriptor = nil
+    end
+end
+
+function Input:_refreshDescriptionLayout(animate)
+    if not self.main then
+        return
+    end
+
+    local window = self.window
+    local shown = self.title.TextTransparency < 1
+    local hasDesc = self.description ~= nil and self.description ~= ""
+    local wantInline = window.inlineDescriptions and hasDesc
+    local isInline = self._inlineDesc and true or false
+
+    if wantInline == isInline then
+        if wantInline then
+            self:_layoutInlineDescription(animate)
+        else
+            self:_syncDescriptor(shown, animate)
+        end
+        return
+    end
+
+    if wantInline then
+        if self.descriptor then
+            window:_cancelReveal(self.descriptor.titleLabel)
+            self.descriptor.main:Destroy()
+            self.descriptor = nil
+        end
+
+        local _, _, containerH = self:_computeInlineLayout()
+
+        self.textColumn = window:Create("Frame", {
+            BackgroundTransparency = 1,
+            Size = UDim2.new(0, textWidth, 0, containerH),
+            LayoutOrder = 1,
+            ZIndex = 5,
+
+            Parent = self.container,
+        })
+        window:Create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Vertical,
+            Padding = UDim.new(0, 3),
+
+            Parent = self.textColumn,
+        })
+
+        window:_cancelReveal(self.title)
+        self.title.Parent = self.textColumn
+        self.title.AutomaticSize = Enum.AutomaticSize.None
+        self.title.LayoutOrder = 1
+
+        self.descLabel = window:Create("TextLabel", {
+            Text = locale.t(self.description),
+            Size = UDim2.new(1, 0, 0, 0),
+            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
+            TextSize = descSize,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            TextWrapped = true,
+            LayoutOrder = 2,
+            ZIndex = 5,
+
+            TextTransparency = 1,
+
+            Parent = self.textColumn,
+        }, { TextColor3 = "ContentColor", FontFace = "Font" })
+
+        self._inlineDesc = true
+        self:_layoutInlineDescription(animate)
+
+        if shown then
+            window:_reveal(self.descLabel, { TextTransparency = 0.7 }, animate)
+        end
+    else
+        window:_cancelReveal(self.title)
+        self.title.Parent = self.container
+        self.title.AutomaticSize = Enum.AutomaticSize.X
+        self.title.Size = UDim2.fromOffset(textWidth, baseContainerH)
+        self.title.LayoutOrder = 1
+
+        if self.descLabel then
+            window:_cancelReveal(self.descLabel)
+        end
+        if self.textColumn then
+            self.textColumn:Destroy()
+            self.textColumn = nil
+        end
+        self.descLabel = nil
+
+        self.container.Size = UDim2.new(0, 170, 0, baseContainerH)
+        self._inlineDesc = false
+        self._mainH = baseMainH
+        self:_resizeMain(baseMainH, animate)
+
+        self:_syncDescriptor(shown, animate)
+    end
+end
+
 function Input:_sizeBox(animate)
     local shown = self.input.Text ~= "" and self.input.Text or self.placeholder
     local width = math.clamp(functions.textWidth(self.window.theme.Font, 15, shown) + 30, 70, 220)
@@ -8766,6 +9164,10 @@ local log = require(utility.log)
 
 local resizeInfo = constants.pillResizeInfo
 local recordInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local descLayoutTween = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+local titleSize, descSize, textWidth = 16, 12, 150
+local baseContainerH, baseMainH = 16, 41
 
 local mouseNames = {
     [Enum.UserInputType.MouseButton1] = "MB1",
@@ -8831,16 +9233,11 @@ function Keybind.new(tab, properties)
         or (not self.forgetState and functions.deriveFlagFromName(self.name) or nil)
     self.window:_registerControl(self)
 
-    local inlineDesc = self.window.inlineDescriptions and self.description and self.description ~= ""
-    local titleSize, descSize, textWidth = 16, 12, 150
-    local baseContainerH, baseMainH = 16, 41
+    local inlineDesc = self.window.inlineDescriptions and self.description and self.description ~= "" and true or false
     local containerH, mainH = baseContainerH, baseMainH
     local titleH, descH = baseContainerH, 0
     if inlineDesc then
-        titleH = functions.textHeight(self.window.theme.Font, titleSize, locale.resolve(self.name), textWidth)
-        descH = functions.textHeight(self.window.theme.Font, descSize, locale.resolve(self.description), textWidth)
-        containerH = titleH + 3 + descH
-        mainH = math.max(baseMainH, baseMainH - baseContainerH + containerH)
+        titleH, descH, containerH, mainH = self:_computeInlineLayout()
     end
     self._inlineDesc, self._mainH = inlineDesc, mainH
 
@@ -9033,6 +9430,153 @@ function Keybind:_sizeBox(animate)
         variables.tweenService:Create(self.box, resizeInfo, { Size = UDim2.fromOffset(width, 30) }):Play()
     else
         self.box.Size = UDim2.fromOffset(width, 30)
+    end
+end
+
+function Keybind:_computeInlineLayout()
+    local titleH = functions.textHeight(self.window.theme.Font, titleSize, locale.resolve(self.name), textWidth)
+    local descH = functions.textHeight(self.window.theme.Font, descSize, locale.resolve(self.description or ""), textWidth)
+    local containerH = titleH + 3 + descH
+    local mainH = math.max(baseMainH, baseMainH - baseContainerH + containerH)
+    return titleH, descH, containerH, mainH
+end
+
+function Keybind:_resizeMain(mainH, animate)
+    local target = UDim2.new(1, -20, 0, mainH)
+    if animate then
+        variables.tweenService:Create(self.main, descLayoutTween, { Size = target }):Play()
+    else
+        self.main.Size = target
+    end
+end
+
+function Keybind:_layoutInlineDescription(animate)
+    local titleH, descH, containerH, mainH = self:_computeInlineLayout()
+    self._mainH = mainH
+
+    self.title.Text = locale.resolve(self.name)
+    self.title.Size = UDim2.new(1, 0, 0, titleH)
+    self.descLabel.Text = locale.resolve(self.description)
+    self.descLabel.Size = UDim2.new(1, 0, 0, descH)
+    self.textColumn.Size = UDim2.new(0, textWidth, 0, containerH)
+    self.container.Size = UDim2.new(0, 170, 0, containerH)
+
+    self:_resizeMain(mainH, animate)
+end
+
+function Keybind:_syncDescriptor(shown, animate)
+    local hasDesc = self.description ~= nil and self.description ~= ""
+    if hasDesc then
+        if self.descriptor then
+            self.descriptor.titleLabel.Text = locale.resolve(self.description)
+        else
+            self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+            self.descriptor.main.LayoutOrder = self.main.LayoutOrder + 1
+            if shown then
+                self.window:_reveal(self.descriptor.titleLabel, { TextTransparency = 0.7 }, animate)
+            end
+        end
+    elseif self.descriptor then
+        self.window:_cancelReveal(self.descriptor.titleLabel)
+        self.descriptor.main:Destroy()
+        self.descriptor = nil
+    end
+end
+
+function Keybind:_refreshDescriptionLayout(animate)
+    if not self.main then
+        return
+    end
+
+    local window = self.window
+    local shown = self.title.TextTransparency < 1
+    local hasDesc = self.description ~= nil and self.description ~= ""
+    local wantInline = window.inlineDescriptions and hasDesc
+    local isInline = self._inlineDesc and true or false
+
+    if wantInline == isInline then
+        if wantInline then
+            self:_layoutInlineDescription(animate)
+        else
+            self:_syncDescriptor(shown, animate)
+        end
+        return
+    end
+
+    if wantInline then
+        if self.descriptor then
+            window:_cancelReveal(self.descriptor.titleLabel)
+            self.descriptor.main:Destroy()
+            self.descriptor = nil
+        end
+
+        local _, _, containerH = self:_computeInlineLayout()
+
+        self.textColumn = window:Create("Frame", {
+            BackgroundTransparency = 1,
+            Size = UDim2.new(0, textWidth, 0, containerH),
+            LayoutOrder = 1,
+            ZIndex = 5,
+
+            Parent = self.container,
+        })
+        window:Create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Vertical,
+            Padding = UDim.new(0, 3),
+
+            Parent = self.textColumn,
+        })
+
+        window:_cancelReveal(self.title)
+        self.title.Parent = self.textColumn
+        self.title.AutomaticSize = Enum.AutomaticSize.None
+        self.title.LayoutOrder = 1
+
+        self.descLabel = window:Create("TextLabel", {
+            Text = locale.t(self.description),
+            Size = UDim2.new(1, 0, 0, 0),
+            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
+            TextSize = descSize,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            TextWrapped = true,
+            LayoutOrder = 2,
+            ZIndex = 5,
+
+            TextTransparency = 1,
+
+            Parent = self.textColumn,
+        }, { TextColor3 = "ContentColor", FontFace = "Font" })
+
+        self._inlineDesc = true
+        self:_layoutInlineDescription(animate)
+
+        if shown then
+            window:_reveal(self.descLabel, { TextTransparency = 0.7 }, animate)
+        end
+    else
+        window:_cancelReveal(self.title)
+        self.title.Parent = self.container
+        self.title.AutomaticSize = Enum.AutomaticSize.X
+        self.title.Size = UDim2.fromOffset(textWidth, baseContainerH)
+        self.title.LayoutOrder = 1
+
+        if self.descLabel then
+            window:_cancelReveal(self.descLabel)
+        end
+        if self.textColumn then
+            self.textColumn:Destroy()
+            self.textColumn = nil
+        end
+        self.descLabel = nil
+
+        self.container.Size = UDim2.new(0, 170, 0, baseContainerH)
+        self._inlineDesc = false
+        self._mainH = baseMainH
+        self:_resizeMain(baseMainH, animate)
+
+        self:_syncDescriptor(shown, animate)
     end
 end
 
@@ -12023,6 +12567,70 @@ function Slider:_applyLayout()
     end
 end
 
+function Slider:_refreshDescriptionLayout(animate)
+    if self.minimal or not self.main then
+        return
+    end
+    if not (self.description and self.description ~= "") then
+        return
+    end
+
+    local window = self.window
+    local wantInline = window.inlineDescriptions and true or false
+    local isInline = self.descLabel ~= nil
+
+    if wantInline == isInline then
+        return
+    end
+
+    local shown = self.title.TextTransparency < 1
+
+    if wantInline then
+        if self.descriptor then
+            window:_cancelReveal(self.descriptor.titleLabel)
+            self.descriptor.main:Destroy()
+            self.descriptor = nil
+        end
+
+        local descH = functions.textHeight(window.theme.Font, 12, locale.resolve(self.description), 170)
+        self.descLabel = window:Create("TextLabel", {
+            Text = locale.t(self.description),
+            Size = UDim2.new(1, 0, 0, descH),
+            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
+            TextSize = 12,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            TextWrapped = true,
+            LayoutOrder = 2,
+            ZIndex = 5,
+
+            TextTransparency = 1,
+
+            Parent = self.container,
+        }, { TextColor3 = "ContentColor", FontFace = "Font" })
+        self._descH = descH + 2
+
+        if shown then
+            window:_reveal(self.descLabel, { TextTransparency = 0.7 }, animate)
+        end
+    else
+        window:_cancelReveal(self.descLabel)
+        self.descLabel:Destroy()
+        self.descLabel = nil
+        self._descH = 0
+
+        self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+        self.descriptor.main.LayoutOrder = self.main.LayoutOrder + 1
+        if shown then
+            window:_reveal(self.descriptor.titleLabel, { TextTransparency = 0.7 }, animate)
+        end
+    end
+
+    self._layoutMode = nil
+    self:_applyLayout()
+end
+
 function Slider:_format(value)
     local text = string.format("%." .. self._decimals .. "f", value)
     if self.suffix ~= "" then
@@ -14386,6 +14994,10 @@ local lockable = require(utility.lockable)
 local locale = require(utility.locale)
 local hapticEngine = require(utility.HapticEngine)
 
+local inlineTitleSize, inlineDescSize, inlineTextWidth = 16, 12, 250
+local baseContainerH, baseMainH = 16, 41
+local descLayoutTween = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
 function Toggle.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
@@ -14519,16 +15131,12 @@ end
 function Toggle:_buildFull()
     local window = self.window
 
-    local inlineDesc = window.inlineDescriptions and self.description and self.description ~= ""
-    local titleSize, descSize, textWidth = 16, 12, 250
-    local baseContainerH, baseMainH = 16, 41
+    local inlineDesc = window.inlineDescriptions and self.description and self.description ~= "" and true or false
+    local titleSize, descSize, textWidth = inlineTitleSize, inlineDescSize, inlineTextWidth
     local containerH, mainH = baseContainerH, baseMainH
     local titleH, descH = baseContainerH, 0
     if inlineDesc then
-        titleH = functions.textHeight(window.theme.Font, titleSize, locale.resolve(self.name), textWidth)
-        descH = functions.textHeight(window.theme.Font, descSize, locale.resolve(self.description), textWidth)
-        containerH = titleH + 3 + descH
-        mainH = math.max(baseMainH, baseMainH - baseContainerH + containerH)
+        titleH, descH, containerH, mainH = self:_computeInlineLayout()
     end
     self._inlineDesc, self._mainH = inlineDesc, mainH
 
@@ -14897,6 +15505,161 @@ function Toggle:_minWidth()
 
     w += functions.textWidth(self.window.theme.Font, 16, locale.resolve(self.name))
     return w
+end
+
+function Toggle:_computeInlineLayout()
+    local titleH = functions.textHeight(self.window.theme.Font, inlineTitleSize, locale.resolve(self.name), inlineTextWidth)
+    local descH = functions.textHeight(
+        self.window.theme.Font,
+        inlineDescSize,
+        locale.resolve(self.description or ""),
+        inlineTextWidth
+    )
+    local containerH = titleH + 3 + descH
+    local mainH = math.max(baseMainH, baseMainH - baseContainerH + containerH)
+    return titleH, descH, containerH, mainH
+end
+
+function Toggle:_resizeMain(mainH, animate)
+    local target = UDim2.new(1, -20, 0, mainH)
+    if animate then
+        variables.tweenService:Create(self.main, descLayoutTween, { Size = target }):Play()
+    else
+        self.main.Size = target
+    end
+end
+
+function Toggle:_layoutInlineDescription(animate)
+    local titleH, descH, containerH, mainH = self:_computeInlineLayout()
+    self._mainH = mainH
+
+    self.title.Text = locale.resolve(self.name)
+    self.title.Size = UDim2.new(1, 0, 0, titleH)
+    self.descLabel.Text = locale.resolve(self.description)
+    self.descLabel.Size = UDim2.new(1, 0, 0, descH)
+    self.textColumn.Size = UDim2.new(0, inlineTextWidth, 0, containerH)
+    self.container.Size = UDim2.new(0, 170, 0, containerH)
+
+    self:_resizeMain(mainH, animate)
+end
+
+function Toggle:_syncDescriptor(shown, animate)
+    local hasDesc = self.description ~= nil and self.description ~= ""
+    if hasDesc then
+        if self.descriptor then
+            self.descriptor.titleLabel.Text = locale.resolve(self.description)
+        else
+            self.descriptor = require(script.Parent.descriptor).new(self.tab, { description = self.description })
+            self.descriptor.main.LayoutOrder = self.main.LayoutOrder + 1
+            if shown then
+                self.window:_reveal(self.descriptor.titleLabel, { TextTransparency = 0.7 }, animate)
+            end
+        end
+    elseif self.descriptor then
+        self.window:_cancelReveal(self.descriptor.titleLabel)
+        self.descriptor.main:Destroy()
+        self.descriptor = nil
+    end
+end
+
+function Toggle:_refreshDescriptionLayout(animate)
+    if self.compact or not self.main then
+        return
+    end
+
+    local window = self.window
+    local shown = self.title.TextTransparency < 1
+    local hasDesc = self.description ~= nil and self.description ~= ""
+    local wantInline = window.inlineDescriptions and hasDesc
+    local isInline = self._inlineDesc and true or false
+
+    if wantInline == isInline then
+        if wantInline then
+            self:_layoutInlineDescription(animate)
+        else
+            self:_syncDescriptor(shown, animate)
+        end
+        return
+    end
+
+    if wantInline then
+        if self.descriptor then
+            window:_cancelReveal(self.descriptor.titleLabel)
+            self.descriptor.main:Destroy()
+            self.descriptor = nil
+        end
+
+        local _, _, containerH = self:_computeInlineLayout()
+
+        self.textColumn = window:Create("Frame", {
+            BackgroundTransparency = 1,
+            Size = UDim2.new(0, inlineTextWidth, 0, containerH),
+            LayoutOrder = 1,
+
+            Parent = self.container,
+        })
+        window:Create("UIListLayout", {
+            FillDirection = Enum.FillDirection.Vertical,
+            Padding = UDim.new(0, 3),
+
+            Parent = self.textColumn,
+        })
+
+        window:_cancelReveal(self.title)
+        self.title.Parent = self.textColumn
+        self.title.AutomaticSize = Enum.AutomaticSize.None
+        self.title.LayoutOrder = 1
+
+        self.descLabel = window:Create("TextLabel", {
+            Text = locale.t(self.description),
+            Size = UDim2.new(1, 0, 0, 0),
+            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
+            TextSize = inlineDescSize,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            TextWrapped = true,
+            LayoutOrder = 2,
+
+            TextTransparency = 1,
+
+            Parent = self.textColumn,
+        }, { TextColor3 = "ContentColor", FontFace = "Font" })
+
+        self._inlineDesc = true
+        self:_layoutInlineDescription(animate)
+
+        if shown then
+            window:_reveal(self.descLabel, { TextTransparency = 0.7 }, animate)
+        end
+    else
+        window:_cancelReveal(self.title)
+        self.title.Parent = self.container
+        self.title.AutomaticSize = Enum.AutomaticSize.X
+        self.title.Size = UDim2.fromOffset(inlineTextWidth, baseContainerH)
+        self.title.LayoutOrder = 1
+
+        if self.descLabel then
+            window:_cancelReveal(self.descLabel)
+        end
+        if self.textColumn then
+            self.textColumn:Destroy()
+            self.textColumn = nil
+        end
+        self.descLabel = nil
+
+        self.container.Size = UDim2.new(0, 170, 0, baseContainerH)
+        self._inlineDesc = false
+        self._mainH = baseMainH
+        self:_resizeMain(baseMainH, animate)
+
+        self:_syncDescriptor(shown, animate)
+    end
+end
+
+function Toggle:SetDescription(description)
+    self.description = if description ~= nil then tostring(description) else nil
+    self:_refreshDescriptionLayout(true)
 end
 
 moveable(Toggle)
@@ -16885,13 +17648,14 @@ function Window:_buildSettingsUI()
 
     self.rfSettings:CreateToggle({
         name = "Inline Descriptions",
-        description = "Shows element descriptions right under their titles instead of on a separate row. Applies to elements created afterwards (rejoin to refresh everything).",
+        description = "Shows element descriptions right under their titles instead of on a separate row.",
         value = self.settings.inlineDescriptions,
         forgetState = true,
         callback = function(state)
             self.settings.inlineDescriptions = state
             self.inlineDescriptions = state
             self:SaveSettings()
+            self:_refreshInlineDescriptions(true)
         end,
     })
 
@@ -17827,11 +18591,58 @@ function Window:_reveal(instance, props, animate, info)
         return
     end
     if animate then
-        variables.tweenService:Create(instance, info or revealInfo, props):Play()
+        local registry = self._revealTweens
+        if not registry then
+            registry = setmetatable({}, { __mode = "k" })
+            self._revealTweens = registry
+        end
+
+        local tween = variables.tweenService:Create(instance, info or revealInfo, props)
+        local tweens = registry[instance]
+        if not tweens then
+            tweens = {}
+            registry[instance] = tweens
+        end
+        table.insert(tweens, tween)
+
+        tween.Completed:Connect(function()
+            local list = registry[instance]
+            if list then
+                local index = table.find(list, tween)
+                if index then
+                    table.remove(list, index)
+                end
+                if #list == 0 then
+                    registry[instance] = nil
+                end
+            end
+        end)
+
+        tween:Play()
     else
         for property, value in props do
             instance[property] = value
         end
+    end
+end
+
+function Window:_cancelReveal(instance)
+    if not instance then
+        return
+    end
+    local registry = self._revealTweens
+    if not registry then
+        return
+    end
+    local tweens = registry[instance]
+    if not tweens then
+        return
+    end
+    registry[instance] = nil
+    for _, tween in tweens do
+        pcall(function()
+            tween:Cancel()
+        end)
     end
 end
 
@@ -17862,6 +18673,23 @@ function Window:_hideCommon(element, animate)
     end
     if element.descLabel then
         self:_reveal(element.descLabel, { TextTransparency = 1 }, animate)
+    end
+end
+
+function Window:_refreshInlineDescriptions(animate)
+    local function walk(elements)
+        for _, element in elements do
+            if element._refreshDescriptionLayout then
+                element:_refreshDescriptionLayout(animate)
+            end
+            if type(element.elements) == "table" then
+                walk(element.elements)
+            end
+        end
+    end
+
+    for _, tab in self.tabs do
+        walk(tab.elements)
     end
 end
 
