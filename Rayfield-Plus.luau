@@ -2086,7 +2086,19 @@ iconPacks.urls = {
     feather = "https://raw.githubusercontent.com/StyearX/Icons/refs/heads/main/Feather/dist/Icons.lua",
 }
 
+iconPacks.defaultPack = "lucide"
+
 local cache: { [string]: any } = {}
+
+local function firstOf(...: any): any
+    for i = 1, select("#", ...) do
+        local v = select(i, ...)
+        if v ~= nil then
+            return v
+        end
+    end
+    return nil
+end
 
 local function fetch(prefix: string)
     local url = iconPacks.urls[prefix]
@@ -2100,8 +2112,12 @@ local function fetch(prefix: string)
         warn("Rayfield: failed to load icon pack '" .. prefix .. "': " .. tostring(result))
         return nil
     end
-    if result.Icons then
-        return { _sprites = result.Spritesheets, _icons = result.Icons }
+
+    local icons = firstOf(result.Icons, result.icons, result.ICONS)
+    local sprites = firstOf(result.Spritesheets, result.spritesheets, result.SpriteSheets, result.Sheets, result.sheets)
+
+    if icons then
+        return { _sprites = sprites, _icons = icons }
     end
     return result
 end
@@ -2120,34 +2136,86 @@ local function looksLikeUri(value: string): boolean
     return string.match(value, "^rbx[a-z]*://") ~= nil
 end
 
+local function resolveSheetId(sprites: any, key: unknown): any
+    if not sprites or key == nil then
+        return nil
+    end
+    local direct = sprites[key]
+    if direct ~= nil then
+        return direct
+    end
+    local asString = sprites[tostring(key)]
+    if asString ~= nil then
+        return asString
+    end
+    local numericKey = tonumber(key :: any)
+    if numericKey ~= nil then
+        local asNumber = sprites[numericKey]
+        if asNumber ~= nil then
+            return asNumber
+        end
+    end
+    return nil
+end
+
+local function findEntry(icons: any, name: string): any
+    local entry = icons[name]
+    if entry ~= nil then
+        return entry
+    end
+    local lowered = string.lower(name)
+    for key, value in icons do
+        if type(key) == "string" and string.lower(key) == lowered then
+            return value
+        end
+    end
+    return nil
+end
+
 function iconPacks.resolve(value: unknown): ({ Image: unknown, ImageRectOffset: Vector2?, ImageRectSize: Vector2? } | string)?
-    if type(value) ~= "string" or looksLikeUri(value) then
+    if type(value) ~= "string" or value == "" or looksLikeUri(value) then
         return nil
     end
+
     local prefix, name = string.match(value, "^([%a%d_%-]+)%/(.+)$")
-    if not prefix then
-        return nil
+    if not (prefix and iconPacks.urls[prefix]) then
+        prefix, name = iconPacks.defaultPack, value
     end
+
     local pack = load(prefix)
     if not pack then
         return nil
     end
+
     if pack._icons then
-        local entry = pack._icons[name]
+        local entry = findEntry(pack._icons, name)
         if not entry then
+            warn("Rayfield: icon '" .. name .. "' was not found in icon pack '" .. prefix .. "'")
             return nil
         end
-        local sheetId = pack._sprites and pack._sprites[tostring(entry.Image)]
-        if not sheetId then
+
+        local sheetId = resolveSheetId(pack._sprites, entry.Image)
+        if sheetId == nil and entry.Image ~= nil then
+            sheetId = entry.Image
+        end
+
+        if sheetId == nil then
+            warn("Rayfield: icon '" .. name .. "' in pack '" .. prefix .. "' has no resolvable image")
             return nil
         end
+
         return {
             Image = sheetId,
             ImageRectOffset = entry.ImageRectPosition,
             ImageRectSize = entry.ImageRectSize,
         }
     end
-    return pack[name]
+
+    local flat = findEntry(pack, name)
+    if flat == nil then
+        warn("Rayfield: icon '" .. name .. "' was not found in icon pack '" .. prefix .. "'")
+    end
+    return flat
 end
 
 return iconPacks
@@ -4222,11 +4290,17 @@ local descLayoutTween = TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.E
 function Button.new(tab, properties)
     properties = if typeof(properties) == "table" then properties else {}
 
+    local rawIcon = properties.icon
+    if rawIcon == nil then
+        rawIcon = properties.Icon
+    end
+    local icon = if rawIcon == false then nil elseif rawIcon == nil then "mouse-pointer-click" else rawIcon
+
     local self = setmetatable({
         tab = assert(tab, "Missing argument #1 (Tab expected)"),
         window = tab.window,
         name = properties.name or properties.Name or properties.title or properties.Title or "Button",
-        icon = properties.icon or properties.Icon,
+        icon = icon,
         description = properties.description or properties.Description,
         compact = tab.compact or false,
 
@@ -4300,19 +4374,6 @@ function Button:_buildFull()
         Parent = self.container,
     })
 
-    if self.icon then
-        self.iconLabel = self.window:Create("ImageLabel", {
-            Image = self.icon,
-            Size = UDim2.fromOffset(16, 16),
-            BorderSizePixel = 0,
-            BackgroundTransparency = 1,
-
-            ImageTransparency = 1,
-
-            Parent = self.container,
-        }, { ImageColor3 = "ContentColor" })
-    end
-
     local titleParent = self.container
     if inlineDesc then
         self.textColumn = self.window:Create("Frame", {
@@ -4365,6 +4426,21 @@ function Button:_buildFull()
 
             Parent = self.textColumn,
         }, { TextColor3 = "ContentColor", FontFace = "Font" })
+    end
+
+    if self.icon then
+        self.iconLabel = self.window:Create("ImageLabel", {
+            Image = self.icon,
+            Size = UDim2.fromOffset(18, 18),
+            Position = UDim2.new(1, -20, 0.5, 0),
+            AnchorPoint = Vector2.new(1, 0.5),
+            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
+
+            ImageTransparency = 1,
+
+            Parent = self.main,
+        }, { ImageColor3 = "AccentColor" })
     end
 
     self.interact = self.window:Create("TextButton", {
@@ -17488,7 +17564,6 @@ function Window:_buildSettingsUI()
 
         self.rfSettings:CreateButton({
             name = "Save Config",
-            icon = constants.icons.config,
             callback = function()
                 local rawName = configNameInput.value
                 local targetName = if rawName ~= "" then rawName else selectedConfig

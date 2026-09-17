@@ -1,4 +1,4 @@
-local Rayfield = loadstring(game:HttpGet("https://cdn.jsdelivr.net/gh/72msreal-pixel/MySoure@main/Rayfield-Plus.luau"))()
+local Rayfield = loadstring(readfile("Rayfield-Plus.luau"))()
 
 local translations = {
     fr = {
@@ -269,7 +269,7 @@ local betaTag = window:CreateTag({ text = "BETA", color = Color3.fromRGB(255, 17
 
 window:CreateSection({ name = "Gameplay" })
 
-local mainTab = window:CreateTab({ name = "Main", icon = "home" })
+local mainTab = window:CreateTab({ name = "Main", icon = "house" })
 
 mainTab:CreateSection({ name = "Buttons & Toggle" })
 
